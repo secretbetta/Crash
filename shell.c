@@ -1,67 +1,45 @@
-#include "cmd_handling.h"
-#include "debug.h"
+/*
+ * @file
+ *
+ * Shell implementation: A shell program that runs on linux
+ */
+
+#include <fcntl.h>
+#include <pwd.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/param.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <ctype.h>
+
 #include "history.h"
-#include "str_func.h"
-#include "timer.h"
+#include "logger.h"
+#include "ui.h"
+#include "util.h"
+#include "builtin.h"
 
-int main(void) {
-	int counter = 1;
-	int status = 1;
+/**
+ * Main method
+ * Runs the whole shell
+ */
+int main(void)
+{
+    init_ui();
 
-	//initalize built-in stuff
-	init_built_in();
+    if (isatty(STDIN_FILENO)) {
+        LOGP("stdin is a TTY; entering interactive mode\n");
+        isScripting(0);
+    } else {
+    	isScripting(1);
+        LOGP("data piped in on stdin; entering script mode\n");
+    }
+    init_builtin();
 
-	//start timing
-	double start = get_time();
+    runner();
 
-	//run infinitely until user specifies exit
-	while (status) {
-		char * line = NULL;
-		size_t line_sz = 0;
-
-		//check if we're scripting
-		if (isatty(STDIN_FILENO)) {
-			print_prompt();  
-		}
-		
-		//grab the line
-		size_t sz = getline(&line, &line_sz, stdin);
-
-		LOG("Line %d has size %zu\n", counter++, sz);
-
-		//if there's nothing then skip it/break it
-		if (sz == -1 || sz == EOF) {
-			LOGP("EOF\n");
-			close(fileno(stdin));
-			break;
-		} else if (sz - 1 == 0) {
-			LOGP("Emptiness\n");
-			decrease_comm_num();
-			continue;
-		} else if (sz > (ARG_MAX * BUF_SZ)) {
-			LOGP("Broken stuff! Get out!\n");
-			decrease_comm_num();
-			continue;
-		}
-
-		status = run(line, 1);
-	}
-	sleep(1);
-
-	//free history stuff
-	LOGP("Freeing history\n");
-	free_history();
-	LOGP("Done freeing history\n");
-
-	//free env variables
-	LOGP("Freeing environment\n");
-	free_env();
-	LOGP("Done free environment\n");
-
-	double end = get_time();
-
-	if (isatty(STDIN_FILENO)) {
-		printf("Time elapsed: %fs\n", end - start);
-	}
-	return 0;
+    return 0;
 }

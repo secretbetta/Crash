@@ -1,94 +1,112 @@
-#include "cmd_handling.h"
-#include "debug.h"
-#include "history.h"
+/*
+ * @file
+ *
+ * History implementation: Functions for the 
+ * history of commands of the shell program
+ */
 
+#include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 
-struct history_entry hist_list[HIST_MAX];
+#include "history.h"
+#include "logger.h"
+
+/** 
+ * History entry
+ * cmd_id = command id
+ * run_time = runtime of command
+ * line = command line
+ */
+struct history_entry {
+    unsigned long cmd_id;
+    double run_time;
+    char *line;
+};
+
+struct history_entry *hist_list = {0};
 int counter = 0;
-long int obj_total = 0;
+int curr = 0;
+int id = 1;
+int lim = 0;
+int circ = 0;
 
-void print_history(void) {
-    /* This function should print history entries */
+void hist_init(unsigned int limit)
+{
+    lim = limit;
+    hist_list = malloc(sizeof(struct history_entry) * limit);
+}
+
+void hist_destroy(void)
+{
     int i;
-
-    for (i = 0; i < counter; i++) {
-    	//print stuff
-    	printf("   %ld %s", hist_list[i].cmd_id, hist_list[i].line);
+    for (i = 0; i < lim; i++) {
+        if (hist_list[i].line != NULL) {
+            free(hist_list[i].line);
+        }
     }
 }
 
-void add_to_history(char * line) {
-	//if we are at max cap, then move stuff down
-	if (counter == 100) {
-		//update counter back
-		counter--;
-		//free the first set of commands
-		free(hist_list[0].line);
-		//move everything down
-		memmove(&hist_list[0], &hist_list[1], sizeof(struct history_entry) * counter);
-	}
+void hist_add(const char *cmd)
+{
+    struct history_entry * command = &hist_list[counter%lim];
+    command->cmd_id = id++;
+    // command->line = malloc(sizeof(char));
+    // strcpy(command->line, cmd);
+    // char tmp[256];
+    // strcpy(tmp, cmd);
+    command->line = strdup(cmd); // CAN I FIX THIS?!?!? memory leak
 
-	//make a pointer so it makes our lives easier
-	struct history_entry * item = &hist_list[counter];
-
-	//keep track of cmd id
-	item->cmd_id = obj_total++;
-	//get a copy of the commands
-	item->line = strdup(line);
-	free(line);
-
-	//update counter if we not at max
-	if (counter < 100) {
-		counter++;
-	}
+    counter++;
+    if (counter > lim) {
+        circ++;
+    }
 }
 
-void free_history(void) {
-	int i;
-
-	for (i = 0; i < counter; i++) {
-		//free original line!!
-		LOG("Freeing history: %s\n", hist_list[i].line);
-		free(hist_list[i].line);
-		LOGP("Done freeing history\n");
-	}
+void hist_print(void)
+{
+    int i = circ;
+    while (i != counter) {
+        printf(" %lu %s\n", hist_list[i%lim].cmd_id, hist_list[i%lim].line);
+        i++;
+    }
 }
 
-void history_exec(struct command_line * cmds) {
-	//check what kind of execution we're doing
-	if (strcmp(cmds[0].tokens[0], "!!") == 0) {
-		run_history_command(obj_total - 1);
-	} else if (cmds[0].tokens[0][0] == '!') {
-		int hist_num = atoi(&cmds[0].tokens[0][1]);
-		if (hist_num == 0 && strcmp(&cmds[0].tokens[0][1], "0") == 0) {
-			run_history_command(hist_num);
-		} else if (hist_num > 0) {
-			run_history_command(hist_num);
-		} else if (hist_num < 0) {
-			printf("%s: invalid history number\n", cmds[0].tokens[0]);
-		}
-	}
+const char *hist_search_prefix(char *prefix)
+{
+    bool exact = true;
+    int curr_id = id-1;
+    const char *tmp;
+    while ((tmp=hist_search_cnum(curr_id)) != NULL) {
+        int i = 0;
+        while (prefix[i] != '\0' && prefix[i] != ' ' && tmp[i] != '\0') {
+            if (prefix[i] != tmp[i]) {
+                exact = false;
+                break;
+            }
+            i++;
+        }
+        if (exact) {
+            return hist_search_cnum(curr_id);
+        }
+        exact = true;
+        curr_id--;
+    }
+    return NULL;
 }
 
-void run_history_command(int hist_num) {
-	//check if we're out of bounds
-	if (hist_num >= obj_total) {
-		return;
-	}
-	if (obj_total > counter) {
-		if (hist_num < obj_total - counter) {
-			return;
-		}
-	} else {
-		if (hist_num < 0) {
-			return;
-		}
-	}
+const char *hist_search_cnum(int command_number)
+{
+    if (command_number > counter || command_number < 0 || command_number < id-lim) {
+        return NULL;
+    }
+    return hist_list[(command_number-1)%lim].line;
+}
 
-	//get where that index is in our list
-	int index = counter - (obj_total - hist_num);
-
-	//run
-	run(hist_list[index].line, 0);
+unsigned int hist_last_cnum(void)
+{
+    curr = id;
+    return curr-1;
 }

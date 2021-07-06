@@ -1,25 +1,39 @@
+/**
+ * @file
+ *
+ * Contains shell history data structures and retrieval functions.
+ */
+
 #ifndef _HISTORY_H_
 #define _HISTORY_H_
 
-#include "cmd_handling.h"
-
-#define HIST_MAX 100
-
-struct history_entry {
-    unsigned long cmd_id;
-    double run_time;
-    char * line;
-    /* What else do we need here? */
-};
-
-void print_history(void);
-
-void add_to_history(char * line);
-
-void free_history(void);
-
-void history_exec(struct command_line * cmds);
-
-void run_history_command(int hist_num);
+/** 
+ * Initializes history
+ */
+void hist_init(unsigned int);
+/** 
+ * Free all history members
+ */
+void hist_destroy(void);
+/** 
+ * Adds to history
+ */
+void hist_add(const char *);
+/** 
+ * Prints history
+ */
+void hist_print(void);
+/** 
+ * Searches for command in history using prefix
+ */
+const char *hist_search_prefix(char *);
+/** 
+ * Search for command in history via ID
+ */
+const char *hist_search_cnum(int);
+/** 
+ * Get the last command in history
+ */
+unsigned int hist_last_cnum(void);
 
 #endif

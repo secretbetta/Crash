@@ -1,0 +1,4 @@
+echo something
+cd /bin
+touch a b cd
+echo get back to work
